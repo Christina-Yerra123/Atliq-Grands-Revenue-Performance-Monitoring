@@ -15,7 +15,7 @@ Approach
 
 **Data Wrangling & Preparation**:
 
-Built a relational database including dim_hotels, fact_bookings, fact_aggregated_bookings, and dim_date.
+Built a relational database including dim_hotels, fact_bookings, fact_aggregated_bookings,dim_rooms and dim_date.
 Checked for null or missing values; ensured data quality using NOT NULL constraints.
 Joined dimension and fact tables for integrated analysis.
 
