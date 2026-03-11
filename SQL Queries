@@ -1,0 +1,117 @@
+-- 1. **Total Bookings per Property**
+SELECT dh.property_name, COUNT(fb.booking_id) AS total_bookings
+FROM dim_hotels dh
+LEFT JOIN fact_bookings fb 
+ON dh.property_id = fb.property_id
+GROUP BY dh.property_name
+ORDER BY total_bookings DESC;
+
+-- 2. **Revenue per Booking Platform**
+SELECT booking_platform, SUM(revenue_generated) AS total_revenue
+FROM fact_bookings
+GROUP BY booking_platform
+ORDER BY total_revenue DESC;
+
+-- 3. **Total Guests per Booking**
+SELECT booking_id, SUM(no_guests) AS total_guests
+FROM fact_bookings
+GROUP BY booking_id
+ORDER BY total_guests DESC;
+
+-- 4. **Average Rating per Property**
+SELECT property_id, AVG(ratings_given) AS avg_rating
+FROM fact_bookings
+WHERE ratings_given IS NOT NULL
+GROUP BY property_id
+ORDER BY avg_rating DESC;
+
+-- 5. **Occupancy % per Property**
+SELECT property_id,
+       SUM(successful_bookings)/SUM(capacity)*100 AS occupancy_percentage
+FROM fact_aggregated_bookings
+GROUP BY property_id
+ORDER BY occupancy_percentage DESC;
+
+-- 6. **Top 5 Properties by Total Bookings**
+SELECT dh.property_name, COUNT(fb.booking_id) AS total_bookings
+FROM dim_hotels dh
+LEFT JOIN fact_bookings fb
+ON dh.property_id = fb.property_id
+GROUP BY dh.property_name
+ORDER BY total_bookings DESC
+LIMIT 5;
+
+-- 7. **Total Cancelled Bookings per Property**
+SELECT dh.property_name, COUNT(fb.booking_id) AS cancelled_bookings
+FROM dim_hotels dh
+LEFT JOIN fact_bookings fb
+ON dh.property_id = fb.property_id
+WHERE fb.booking_status = 'Cancelled'
+GROUP BY dh.property_name
+ORDER BY cancelled_bookings DESC;
+
+-- 8. **Revenue per Property**
+SELECT dh.property_name, SUM(fb.revenue_realized) AS total_revenue
+FROM dim_hotels dh
+LEFT JOIN fact_bookings fb
+ON dh.property_id = fb.property_id
+GROUP BY dh.property_name
+ORDER BY total_revenue DESC;
+
+-- 9. **Running Revenue per Property**
+WITH cte AS (
+  SELECT dh.property_id, dh.property_name, fb.booking_date, fb.revenue_realized
+  FROM dim_hotels dh
+  LEFT JOIN fact_bookings fb
+  ON dh.property_id = fb.property_id
+)
+SELECT property_id, property_name, booking_date, revenue_realized,
+       SUM(revenue_realized) OVER (PARTITION BY property_id ORDER BY booking_date) AS running_revenue
+FROM cte;
+
+-- 10. **Properties Above Average Revenue**
+WITH cte AS (
+  SELECT dh.property_id, dh.property_name, SUM(fb.revenue_realized) AS total_revenue
+  FROM dim_hotels dh
+  LEFT JOIN fact_bookings fb
+  ON dh.property_id = fb.property_id
+  GROUP BY dh.property_id, dh.property_name
+)
+SELECT property_id, property_name, total_revenue
+FROM cte
+WHERE total_revenue > (SELECT AVG(total_revenue) FROM cte)
+ORDER BY total_revenue DESC;
+
+-- 11. **Top Property by Occupancy per City**
+WITH cte AS (
+  SELECT dh.city, dh.property_id, dh.property_name,
+         SUM(fa.successful_bookings)*100.0/SUM(fa.capacity) AS occupancy_percentage
+  FROM dim_hotels dh
+  LEFT JOIN fact_aggregated_bookings fa
+  ON dh.property_id = fa.property_id
+  GROUP BY dh.city, dh.property_id, dh.property_name
+),
+ranked AS (
+  SELECT *, ROW_NUMBER() OVER (PARTITION BY city ORDER BY occupancy_percentage DESC) AS rn
+  FROM cte
+)
+SELECT city, property_id, property_name, occupancy_percentage
+FROM ranked
+WHERE rn = 1;
+
+-- 12. **Top 3 Booking Platforms by Revenue per City**
+WITH city_platform AS (
+  SELECT dh.city, fb.booking_platform, SUM(fb.revenue_realized) AS total_revenue
+  FROM dim_hotels dh
+  LEFT JOIN fact_bookings fb
+  ON dh.property_id = fb.property_id
+  GROUP BY dh.city, fb.booking_platform
+),
+ranked AS (
+  SELECT *, ROW_NUMBER() OVER (PARTITION BY city ORDER BY total_revenue DESC) AS rn
+  FROM city_platform
+)
+SELECT city, booking_platform, total_revenue
+FROM ranked
+WHERE rn <= 3
+ORDER BY city, total_revenue DESC;
