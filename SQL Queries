@@ -1,3 +1,5 @@
+Atliq Grands – Revenue & Performance Monitoring
+
 -- 1. **Total Bookings per Property**
 SELECT dh.property_name, COUNT(fb.booking_id) AS total_bookings
 FROM dim_hotels dh
